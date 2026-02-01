@@ -1,0 +1,304 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Organizations - Root and Organizational Units Structure'
+
+Parameters:
+  OrganizationName:
+    Type: String
+    Default: 'AI-Med-Agent-Organization'
+    Description: Name of the AWS Organization
+
+Resources:
+  # Enable AWS Organizations (run this in the management account)
+  Organization:
+    Type: AWS::Organizations::Organization
+    Properties:
+      FeatureSet: ALL
+
+  # Root-level Organizational Units
+  ProductionOU:
+    Type: AWS::Organizations::OrganizationalUnit
+    Properties:
+      Name: Production
+      ParentId: !GetAtt Organization.RootId
+
+  DevelopmentOU:
+    Type: AWS::Organizations::OrganizationalUnit
+    Properties:
+      Name: Development
+      ParentId: !GetAtt Organization.RootId
+
+  StagingOU:
+    Type: AWS::Organizations::OrganizationalUnit
+    Properties:
+      Name: Staging
+      ParentId: !GetAtt Organization.RootId
+
+  SecurityOU:
+    Type: AWS::Organizations::OrganizationalUnit
+    Properties:
+      Name: Security
+      ParentId: !GetAtt Organization.RootId
+
+  InfrastructureOU:
+    Type: AWS::Organizations::OrganizationalUnit
+    Properties:
+      Name: Infrastructure
+      ParentId: !GetAtt Organization.RootId
+
+  # Nested OUs under Production
+  ProductionWorkloadsOU:
+    Type: AWS::Organizations::OrganizationalUnit
+    Properties:
+      Name: Workloads
+      ParentId: !Ref ProductionOU
+
+  ProductionDataOU:
+    Type: AWS::Organizations::OrganizationalUnit
+    Properties:
+      Name: Data
+      ParentId: !Ref ProductionOU
+
+  # Nested OUs under Development
+  DevelopmentWorkloadsOU:
+    Type: AWS::Organizations::OrganizationalUnit
+    Properties:
+      Name: Workloads
+      ParentId: !Ref DevelopmentOU
+
+  DevelopmentSandboxOU:
+    Type: AWS::Organizations::OrganizationalUnit
+    Properties:
+      Name: Sandbox
+      ParentId: !Ref DevelopmentOU
+
+  # Service Control Policies
+  DenyRootUserPolicy:
+    Type: AWS::Organizations::Policy
+    Properties:
+      Name: DenyRootUserAccess
+      Description: Deny root user access across all accounts
+      Type: SERVICE_CONTROL_POLICY
+      Content: |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "DenyRootUser",
+              "Effect": "Deny",
+              "Action": "*",
+              "Resource": "*",
+              "Condition": {
+                "StringLike": {
+                  "aws:PrincipalArn": "arn:aws:iam::*:root"
+                }
+              }
+            }
+          ]
+        }
+      TargetIds:
+        - !Ref ProductionOU
+        - !Ref DevelopmentOU
+        - !Ref StagingOU
+
+  RequireMFAPolicy:
+    Type: AWS::Organizations::Policy
+    Properties:
+      Name: RequireMFA
+      Description: Require MFA for all actions
+      Type: SERVICE_CONTROL_POLICY
+      Content: |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "DenyAllExceptListedIfNoMFA",
+              "Effect": "Deny",
+              "NotAction": [
+                "iam:CreateVirtualMFADevice",
+                "iam:EnableMFADevice",
+                "iam:GetUser",
+                "iam:ListMFADevices",
+                "iam:ListVirtualMFADevices",
+                "iam:ResyncMFADevice",
+                "sts:GetSessionToken"
+              ],
+              "Resource": "*",
+              "Condition": {
+                "BoolIfExists": {
+                  "aws:MultiFactorAuthPresent": "false"
+                }
+              }
+            }
+          ]
+        }
+      TargetIds:
+        - !Ref ProductionOU
+        - !Ref SecurityOU
+
+  DenyRegionPolicy:
+    Type: AWS::Organizations::Policy
+    Properties:
+      Name: DenyNonApprovedRegions
+      Description: Deny access to non-approved AWS regions
+      Type: SERVICE_CONTROL_POLICY
+      Content: |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "DenyNonApprovedRegions",
+              "Effect": "Deny",
+              "NotAction": [
+                "cloudfront:*",
+                "iam:*",
+                "route53:*",
+                "support:*",
+                "budgets:*"
+              ],
+              "Resource": "*",
+              "Condition": {
+                "StringNotEquals": {
+                  "aws:RequestedRegion": [
+                    "us-east-1",
+                    "us-west-2",
+                    "eu-west-1"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      TargetIds:
+        - !Ref ProductionOU
+        - !Ref DevelopmentOU
+
+  PreventDataDeletionPolicy:
+    Type: AWS::Organizations::Policy
+    Properties:
+      Name: PreventDataDeletion
+      Description: Prevent deletion of critical data resources
+      Type: SERVICE_CONTROL_POLICY
+      Content: |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "PreventS3BucketDeletion",
+              "Effect": "Deny",
+              "Action": [
+                "s3:DeleteBucket",
+                "s3:DeleteBucketPolicy"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "PreventRDSDeletion",
+              "Effect": "Deny",
+              "Action": [
+                "rds:DeleteDBInstance",
+                "rds:DeleteDBCluster"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "PreventDynamoDBDeletion",
+              "Effect": "Deny",
+              "Action": [
+                "dynamodb:DeleteTable"
+              ],
+              "Resource": "*"
+            }
+          ]
+        }
+      TargetIds:
+        - !Ref ProductionOU
+
+  # Tag Policies
+  RequiredTagsPolicy:
+    Type: AWS::Organizations::Policy
+    Properties:
+      Name: RequiredTags
+      Description: Require specific tags on resources
+      Type: TAG_POLICY
+      Content: |
+        {
+          "tags": {
+            "Environment": {
+              "tag_key": {
+                "@@assign": "Environment"
+              },
+              "tag_value": {
+                "@@assign": [
+                  "Production",
+                  "Development",
+                  "Staging"
+                ]
+              },
+              "enforced_for": {
+                "@@assign": [
+                  "ec2:instance",
+                  "rds:db",
+                  "s3:bucket"
+                ]
+              }
+            },
+            "Owner": {
+              "tag_key": {
+                "@@assign": "Owner"
+              },
+              "enforced_for": {
+                "@@assign": [
+                  "ec2:*",
+                  "rds:*",
+                  "s3:*"
+                ]
+              }
+            },
+            "CostCenter": {
+              "tag_key": {
+                "@@assign": "CostCenter"
+              },
+              "enforced_for": {
+                "@@assign": [
+                  "ec2:*",
+                  "rds:*",
+                  "s3:*"
+                ]
+              }
+            }
+          }
+        }
+      TargetIds:
+        - !Ref ProductionOU
+        - !Ref DevelopmentOU
+
+Outputs:
+  OrganizationId:
+    Description: AWS Organization ID
+    Value: !Ref Organization
+    Export:
+      Name: !Sub '${AWS::StackName}-OrganizationId'
+
+  OrganizationRootId:
+    Description: AWS Organization Root ID
+    Value: !GetAtt Organization.RootId
+    Export:
+      Name: !Sub '${AWS::StackName}-RootId'
+
+  ProductionOUId:
+    Description: Production OU ID
+    Value: !Ref ProductionOU
+    Export:
+      Name: !Sub '${AWS::StackName}-ProductionOU'
+
+  DevelopmentOUId:
+    Description: Development OU ID
+    Value: !Ref DevelopmentOU
+    Export:
+      Name: !Sub '${AWS::StackName}-DevelopmentOU'
+
+  SecurityOUId:
+    Description: Security OU ID
+    Value: !Ref SecurityOU
+    Export:
+      Name: !Sub '${AWS::StackName}-SecurityOU'

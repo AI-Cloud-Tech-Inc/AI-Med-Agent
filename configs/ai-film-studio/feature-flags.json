@@ -1,0 +1,34 @@
+{
+  "flags": {
+    "auto_scene_detection": {
+      "name": "Automatic Scene Detection",
+      "description": "AI-powered automatic scene detection and segmentation",
+      "enabled": true
+    },
+    "ai_voice_generation": {
+      "name": "AI Voice Generation",
+      "description": "Generate realistic voice-overs using AI",
+      "enabled": true
+    },
+    "collaborative_editing": {
+      "name": "Collaborative Editing",
+      "description": "Real-time collaborative editing features",
+      "enabled": false
+    },
+    "gpu_acceleration": {
+      "name": "GPU Acceleration",
+      "description": "Use GPU for video processing acceleration",
+      "enabled": true
+    },
+    "4k_rendering": {
+      "name": "4K Rendering",
+      "description": "Enable 4K resolution video rendering",
+      "enabled": true
+    },
+    "auto_color_grading": {
+      "name": "Automatic Color Grading",
+      "description": "AI-powered automatic color grading",
+      "enabled": false
+    }
+  }
+}

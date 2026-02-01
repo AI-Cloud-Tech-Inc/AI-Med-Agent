@@ -1,0 +1,50 @@
+"""
+AI-Film-Studio AppConfig Infrastructure
+
+Extends base template for AI-Film-Studio specific requirements.
+"""
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AI-Film-Studio AppConfig Infrastructure'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Deployment environment
+
+Resources:
+  BaseInfrastructure:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./base-appconfig.yaml
+      Parameters:
+        ProjectName: ai-film-studio
+        Environment: !Ref Environment
+        ApplicationDescription: 'AI-Film-Studio: AI-Powered Film Production Platform'
+        EnableMonitoring: 'true'
+      Tags:
+        - Key: Project
+          Value: ai-film-studio
+        - Key: Component
+          Value: appconfig
+
+Outputs:
+  ApplicationId:
+    Description: AppConfig Application ID
+    Value: !GetAtt BaseInfrastructure.Outputs.ApplicationId
+    Export:
+      Name: !Sub 'ai-film-studio-appconfig-${Environment}-ApplicationId'
+
+  ConfigBucket:
+    Description: S3 bucket for configurations
+    Value: !GetAtt BaseInfrastructure.Outputs.ConfigBucketName
+    Export:
+      Name: !Sub 'ai-film-studio-appconfig-${Environment}-ConfigBucket'
+
+  EnvironmentId:
+    Description: AppConfig Environment ID
+    Value: !GetAtt BaseInfrastructure.Outputs.EnvironmentId
+    Export:
+      Name: !Sub 'ai-film-studio-appconfig-${Environment}-EnvironmentId'

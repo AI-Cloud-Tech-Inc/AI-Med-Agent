@@ -1,0 +1,346 @@
+"""
+Base AWS AppConfig Infrastructure Template
+
+Reusable CloudFormation template for AppConfig deployment across multiple projects.
+This template creates the core AppConfig resources needed for any project.
+"""
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Base AWS AppConfig Infrastructure - Reusable across projects'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Name of the project (e.g., ai-med-agent, ai-film-studio)
+    AllowedPattern: '[a-z0-9-]+'
+
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Deployment environment
+
+  ApplicationDescription:
+    Type: String
+    Default: 'Application configuration management'
+    Description: Description for the AppConfig application
+
+  EnableMonitoring:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Enable CloudWatch monitoring and alarms
+
+Resources:
+  # ============================================================================
+  # AppConfig Application
+  # ============================================================================
+
+  Application:
+    Type: AWS::AppConfig::Application
+    Properties:
+      Name: !Sub '${ProjectName}-app'
+      Description: !Ref ApplicationDescription
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ============================================================================
+  # Environments
+  # ============================================================================
+
+  DevEnvironment:
+    Type: AWS::AppConfig::Environment
+    Condition: IsDevEnvironment
+    Properties:
+      ApplicationId: !Ref Application
+      Name: !Sub '${ProjectName}-dev'
+      Description: !Sub 'Development environment for ${ProjectName}'
+      Monitors:
+        - AlarmArn: !If [EnableMonitoringCondition, !GetAtt ConfigAlarm.Arn, !Ref 'AWS::NoValue']
+          AlarmRoleArn: !If [EnableMonitoringCondition, !GetAtt AppConfigMonitorRole.Arn, !Ref 'AWS::NoValue']
+      Tags:
+        - Key: Environment
+          Value: dev
+
+  StagingEnvironment:
+    Type: AWS::AppConfig::Environment
+    Condition: IsStagingEnvironment
+    Properties:
+      ApplicationId: !Ref Application
+      Name: !Sub '${ProjectName}-staging'
+      Description: !Sub 'Staging environment for ${ProjectName}'
+      Monitors:
+        - AlarmArn: !If [EnableMonitoringCondition, !GetAtt ConfigAlarm.Arn, !Ref 'AWS::NoValue']
+          AlarmRoleArn: !If [EnableMonitoringCondition, !GetAtt AppConfigMonitorRole.Arn, !Ref 'AWS::NoValue']
+      Tags:
+        - Key: Environment
+          Value: staging
+
+  ProdEnvironment:
+    Type: AWS::AppConfig::Environment
+    Condition: IsProdEnvironment
+    Properties:
+      ApplicationId: !Ref Application
+      Name: !Sub '${ProjectName}-prod'
+      Description: !Sub 'Production environment for ${ProjectName}'
+      Monitors:
+        - AlarmArn: !If [EnableMonitoringCondition, !GetAtt ConfigAlarm.Arn, !Ref 'AWS::NoValue']
+          AlarmRoleArn: !If [EnableMonitoringCondition, !GetAtt AppConfigMonitorRole.Arn, !Ref 'AWS::NoValue']
+      Tags:
+        - Key: Environment
+          Value: prod
+
+  # ============================================================================
+  # Configuration Profiles
+  # ============================================================================
+
+  MainConfigProfile:
+    Type: AWS::AppConfig::ConfigurationProfile
+    Properties:
+      ApplicationId: !Ref Application
+      Name: !Sub '${ProjectName}-config'
+      Description: !Sub 'Main configuration for ${ProjectName}'
+      LocationUri: !Sub 's3://${ConfigBucket}/${ProjectName}-config.json'
+      Type: AWS.Freeform
+      Validators:
+        - Type: JSON_SCHEMA
+          Content: !Sub |
+            {
+              "$schema": "http://json-schema.org/draft-07/schema#",
+              "type": "object",
+              "properties": {
+                "log_level": {
+                  "type": "string",
+                  "enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+                },
+                "max_retries": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10
+                },
+                "require_approval": {
+                  "type": "boolean"
+                }
+              },
+              "required": ["log_level"]
+            }
+
+  FeatureFlagsProfile:
+    Type: AWS::AppConfig::ConfigurationProfile
+    Properties:
+      ApplicationId: !Ref Application
+      Name: feature-flags
+      Description: !Sub 'Feature flags for ${ProjectName}'
+      LocationUri: !Sub 's3://${ConfigBucket}/${ProjectName}-feature-flags.json'
+      Type: AWS.AppConfig.FeatureFlags
+
+  # ============================================================================
+  # Deployment Strategies
+  # ============================================================================
+
+  LinearDeploymentStrategy:
+    Type: AWS::AppConfig::DeploymentStrategy
+    Properties:
+      Name: !Sub '${ProjectName}-linear'
+      Description: !Sub 'Linear deployment for ${ProjectName} (10% every 30 seconds)'
+      DeploymentDurationInMinutes: 5
+      FinalBakeTimeInMinutes: 5
+      GrowthFactor: 10
+      GrowthType: Linear
+      ReplicateTo: NONE
+
+  CanaryDeploymentStrategy:
+    Type: AWS::AppConfig::DeploymentStrategy
+    Properties:
+      Name: !Sub '${ProjectName}-canary'
+      Description: !Sub 'Canary deployment for ${ProjectName} (20% then 100%)'
+      DeploymentDurationInMinutes: 10
+      FinalBakeTimeInMinutes: 5
+      GrowthFactor: 80
+      GrowthType: Exponential
+      ReplicateTo: NONE
+
+  # ============================================================================
+  # Storage
+  # ============================================================================
+
+  ConfigBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectName}-appconfig-${AWS::AccountId}-${Environment}'
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 90
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  ConfigBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ConfigBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt ConfigBucket.Arn
+              - !Sub '${ConfigBucket.Arn}/*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': false
+
+  # ============================================================================
+  # IAM Roles
+  # ============================================================================
+
+  AppConfigMonitorRole:
+    Type: AWS::IAM::Role
+    Condition: EnableMonitoringCondition
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: appconfig.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # ============================================================================
+  # Monitoring
+  # ============================================================================
+
+  ConfigAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: EnableMonitoringCondition
+    Properties:
+      AlarmName: !Sub '${ProjectName}-appconfig-deployment-error-${Environment}'
+      AlarmDescription: !Sub 'Alert on ${ProjectName} AppConfig deployment errors'
+      MetricName: DeploymentErrors
+      Namespace: AWS/AppConfig
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: Application
+          Value: !Ref Application
+
+  DeploymentDurationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: EnableMonitoringCondition
+    Properties:
+      AlarmName: !Sub '${ProjectName}-appconfig-deployment-duration-${Environment}'
+      AlarmDescription: !Sub 'Alert on ${ProjectName} AppConfig slow deployments'
+      MetricName: DeploymentDuration
+      Namespace: AWS/AppConfig
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 900000
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: Application
+          Value: !Ref Application
+
+  # ============================================================================
+  # Conditions
+  # ============================================================================
+
+Conditions:
+  IsDevEnvironment: !Equals [!Ref Environment, 'dev']
+  IsStagingEnvironment: !Equals [!Ref Environment, 'staging']
+  IsProdEnvironment: !Equals [!Ref Environment, 'prod']
+  EnableMonitoringCondition: !Equals [!Ref EnableMonitoring, 'true']
+
+Outputs:
+  ApplicationId:
+    Description: AppConfig Application ID
+    Value: !Ref Application
+    Export:
+      Name: !Sub '${AWS::StackName}-ApplicationId'
+
+  ApplicationName:
+    Description: AppConfig Application Name
+    Value: !Sub '${ProjectName}-app'
+    Export:
+      Name: !Sub '${AWS::StackName}-ApplicationName'
+
+  ConfigBucketName:
+    Description: S3 bucket for configurations
+    Value: !Ref ConfigBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-ConfigBucket'
+
+  EnvironmentId:
+    Description: AppConfig Environment ID
+    Value: !If
+      - IsDevEnvironment
+      - !Ref DevEnvironment
+      - !If
+        - IsStagingEnvironment
+        - !Ref StagingEnvironment
+        - !Ref ProdEnvironment
+    Export:
+      Name: !Sub '${AWS::StackName}-EnvironmentId'
+
+  EnvironmentName:
+    Description: AppConfig Environment Name
+    Value: !Sub '${ProjectName}-${Environment}'
+    Export:
+      Name: !Sub '${AWS::StackName}-EnvironmentName'
+
+  MainConfigProfileId:
+    Description: Main Configuration Profile ID
+    Value: !Ref MainConfigProfile
+    Export:
+      Name: !Sub '${AWS::StackName}-MainConfigProfileId'
+
+  FeatureFlagsProfileId:
+    Description: Feature Flags Configuration Profile ID
+    Value: !Ref FeatureFlagsProfile
+    Export:
+      Name: !Sub '${AWS::StackName}-FeatureFlagsProfileId'
+
+  LinearStrategyId:
+    Description: Linear Deployment Strategy ID
+    Value: !Ref LinearDeploymentStrategy
+    Export:
+      Name: !Sub '${AWS::StackName}-LinearStrategyId'
+
+  CanaryStrategyId:
+    Description: Canary Deployment Strategy ID
+    Value: !Ref CanaryDeploymentStrategy
+    Export:
+      Name: !Sub '${AWS::StackName}-CanaryStrategyId'

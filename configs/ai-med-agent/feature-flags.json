@@ -1,0 +1,39 @@
+{
+  "flags": {
+    "autonomous_clinical_support": {
+      "name": "Autonomous Clinical Support",
+      "description": "Enable autonomous clinical decision support workflows",
+      "enabled": true
+    },
+    "multi_agent_orchestration": {
+      "name": "Multi-Agent Orchestration",
+      "description": "Enable triage, diagnosis, monitoring, and follow-up agents",
+      "enabled": true
+    },
+    "explainability_logs": {
+      "name": "Explainability Logs",
+      "description": "Enable detailed reasoning traces and audit logs",
+      "enabled": true
+    },
+    "privacy_enforcement": {
+      "name": "Privacy Enforcement",
+      "description": "Enforce consent and patient read-only access policies",
+      "enabled": true
+    },
+    "realtime_transcription": {
+      "name": "Realtime Transcription",
+      "description": "Enable live transcription during encounters",
+      "enabled": true
+    },
+    "emergency_assist": {
+      "name": "Emergency Assist",
+      "description": "Enable patient-triggered emergency escalation with audit logging",
+      "enabled": true
+    },
+    "emergency_risk_detection": {
+      "name": "Emergency Risk Detection",
+      "description": "Enable AI-assisted emergency risk recommendation (no auto-call)",
+      "enabled": true
+    }
+  }
+}

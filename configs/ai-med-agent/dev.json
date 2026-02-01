@@ -1,0 +1,61 @@
+{
+  "agent": {
+    "log_level": "DEBUG",
+    "max_retries": 3,
+    "require_approval": true,
+    "transcription_enabled": true,
+    "multi_agent_orchestration": true,
+    "decision_logging": true
+  },
+  "clinical": {
+    "consent_required": true,
+    "realtime_transcription": true,
+    "note_templates": {
+      "soap": true
+    },
+    "human_approval_required": true,
+    "confidence_thresholds": {
+      "recommendations": 0.6,
+      "entity_extraction": 0.5
+    }
+  },
+  "privacy": {
+    "audit_logging": true,
+    "data_retention_days": 30,
+    "encrypt_at_rest": true,
+    "patient_read_only_resources": [
+      "lab_reports",
+      "medications",
+      "appointments",
+      "insurance"
+    ]
+  },
+  "aws": {
+    "region": "us-east-1",
+    "transcribe": {
+      "enabled": true,
+      "output_bucket": "ai-med-agent-transcripts-dev",
+      "language_code": "en-US"
+    },
+    "bedrock": {
+      "enabled": true,
+      "model_id": "anthropic.claude-3-sonnet-20240229-v1:0"
+    },
+    "dynamodb": {
+      "encounters_table": "ai-med-agent-encounters-dev",
+      "audit_table": "ai-med-agent-audit-dev"
+    }
+  },
+  "features": {
+    "autonomous_clinical_support": true,
+    "multi_agent_orchestration": true,
+    "explainability": true,
+    "governance_audit": true,
+    "emergency_assist": true,
+    "emergency_risk_detection": true
+  },
+  "monitoring": {
+    "custom_metrics_enabled": true,
+    "log_retention_days": 7
+  }
+}
