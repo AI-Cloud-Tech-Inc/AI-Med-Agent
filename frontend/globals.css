@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  @apply transition-colors duration-200;
+}
+
+body {
+  @apply bg-primary text-white font-sans;
+}
+
+/* Touch target minimum 44x44px for mobile */
+.touch-target {
+  @apply min-h-11 flex items-center;
+}
+
+.gradient-text {
+  @apply bg-gradient-to-r from-indigo-400 to-purple-500 bg-clip-text text-transparent;
+}
+
+.card {
+  @apply bg-secondary border border-primary rounded-lg p-4 sm:p-6 hover:border-accent transition-all;
+}
+
+.btn-primary {
+  @apply bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-medium py-2 px-4 rounded-lg transition-colors min-h-10 sm:min-h-11;
+}
+
+.btn-secondary {
+  @apply bg-dark-tertiary hover:bg-primary active:bg-dark-secondary border border-primary text-white font-medium py-2 px-4 rounded-lg transition-colors min-h-10 sm:min-h-11;
+}
+
+.btn-ghost {
+  @apply text-white hover:bg-dark-tertiary active:bg-primary font-medium py-2 px-4 rounded-lg transition-colors min-h-10 sm:min-h-11;
+}
+
+.input-field {
+  @apply w-full bg-dark-secondary border border-primary rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-base sm:text-sm;
+}
+
+.badge-success {
+  @apply inline-flex items-center px-3 py-1 rounded-full text-xs sm:text-sm font-medium bg-green-900 text-green-200 whitespace-nowrap;
+}
+
+.badge-warning {
+  @apply inline-flex items-center px-3 py-1 rounded-full text-xs sm:text-sm font-medium bg-yellow-900 text-yellow-200 whitespace-nowrap;
+}
+
+.badge-danger {
+  @apply inline-flex items-center px-3 py-1 rounded-full text-xs sm:text-sm font-medium bg-red-900 text-red-200 whitespace-nowrap;
+}
+
+.badge-info {
+  @apply inline-flex items-center px-3 py-1 rounded-full text-xs sm:text-sm font-medium bg-blue-900 text-blue-200 whitespace-nowrap;
+}
+
+/* Responsive typography */
+h1 {
+  @apply text-3xl sm:text-4xl;
+}
+
+h2 {
+  @apply text-2xl sm:text-3xl;
+}
+
+h3 {
+  @apply text-xl sm:text-2xl;
+}
+
+h4 {
+  @apply text-lg sm:text-xl;
+}
+
+/* Mobile-friendly tables */
+table {
+  @apply text-xs sm:text-sm;
+}
+
+th, td {
+  @apply px-2 sm:px-4 py-2 sm:py-3;
+}
+
+/* Scrollable containers on mobile */
+.overflow-x-auto {
+  @apply -mx-4 px-4 sm:mx-0 sm:px-0;
+}

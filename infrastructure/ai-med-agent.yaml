@@ -1,0 +1,50 @@
+"""
+AI-Med-Agent AppConfig Infrastructure
+
+Extends base template for AI-Med-Agent specific requirements.
+"""
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AI-Med-Agent AppConfig Infrastructure'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Deployment environment
+
+Resources:
+  BaseInfrastructure:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./base-appconfig.yaml
+      Parameters:
+        ProjectName: ai-med-agent
+        Environment: !Ref Environment
+        ApplicationDescription: 'AI-Med-Agent: Autonomous AWS Organizations Management'
+        EnableMonitoring: 'true'
+      Tags:
+        - Key: Project
+          Value: ai-med-agent
+        - Key: Component
+          Value: appconfig
+
+Outputs:
+  ApplicationId:
+    Description: AppConfig Application ID
+    Value: !GetAtt BaseInfrastructure.Outputs.ApplicationId
+    Export:
+      Name: !Sub 'ai-med-agent-appconfig-${Environment}-ApplicationId'
+
+  ConfigBucket:
+    Description: S3 bucket for configurations
+    Value: !GetAtt BaseInfrastructure.Outputs.ConfigBucketName
+    Export:
+      Name: !Sub 'ai-med-agent-appconfig-${Environment}-ConfigBucket'
+
+  EnvironmentId:
+    Description: AppConfig Environment ID
+    Value: !GetAtt BaseInfrastructure.Outputs.EnvironmentId
+    Export:
+      Name: !Sub 'ai-med-agent-appconfig-${Environment}-EnvironmentId'

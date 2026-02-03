@@ -1,0 +1,98 @@
+name: Deploy AI-Film-Studio AppConfig
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'configs/ai-film-studio/**'
+      - 'infrastructure/ai-film-studio.yaml'
+      - 'infrastructure/base-appconfig.yaml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        description: 'Target environment'
+        options:
+          - dev
+          - staging
+          - prod
+        default: dev
+      strategy:
+        type: choice
+        description: 'Deployment strategy'
+        options:
+          - linear
+          - canary
+        default: linear
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install boto3 python-dotenv pyyaml
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_APPCONFIG_DEPLOY_ROLE }}
+          role-session-name: gh-actions-appconfig-deploy
+          aws-region: us-east-1
+
+      - name: Deploy AppConfig infrastructure
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          aws cloudformation deploy \
+            --template-file infrastructure/ai-film-studio.yaml \
+            --stack-name ai-film-studio-appconfig-${{ github.event.inputs.environment || 'dev' }} \
+            --parameter-overrides Environment=${{ github.event.inputs.environment || 'dev' }} \
+            --capabilities CAPABILITY_IAM \
+            --no-fail-on-empty-changeset
+
+      - name: Get stack outputs
+        id: stack-outputs
+        run: |
+          APP_ID=$(aws cloudformation describe-stacks \
+            --stack-name ai-film-studio-appconfig-${{ github.event.inputs.environment || 'dev' }} \
+            --query "Stacks[0].Outputs[?OutputKey=='ApplicationId'].OutputValue" \
+            --output text)
+          echo "application-id=$APP_ID" >> $GITHUB_OUTPUT
+
+      - name: Upload configurations to S3
+        run: |
+          BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name ai-film-studio-appconfig-${{ github.event.inputs.environment || 'dev' }} \
+            --query "Stacks[0].Outputs[?OutputKey=='ConfigBucket'].OutputValue" \
+            --output text)
+          
+          ENV=${{ github.event.inputs.environment || 'dev' }}
+          aws s3 cp configs/ai-film-studio/${ENV}.json s3://${BUCKET}/ai-film-studio-config.json
+          aws s3 cp configs/ai-film-studio/feature-flags.json s3://${BUCKET}/ai-film-studio-feature-flags.json
+
+      - name: Deploy configuration
+        run: |
+          python scripts/deploy.py \
+            --application-id ${{ steps.stack-outputs.outputs.application-id }} \
+            --environment ${{ github.event.inputs.environment || 'dev' }} \
+            --config-file configs/ai-film-studio/${{ github.event.inputs.environment || 'dev' }}.json \
+            --strategy ${{ github.event.inputs.strategy || 'linear' }} \
+            --verbose
+
+      - name: Notify deployment
+        if: always()
+        run: |
+          echo "AppConfig deployment for AI-Film-Studio: ${{ job.status }}"
+          echo "Environment: ${{ github.event.inputs.environment || 'dev' }}"
+          echo "Strategy: ${{ github.event.inputs.strategy || 'linear' }}"

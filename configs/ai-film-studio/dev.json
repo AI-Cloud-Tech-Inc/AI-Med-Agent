@@ -1,0 +1,30 @@
+{
+  "application": {
+    "log_level": "DEBUG",
+    "max_retries": 3,
+    "enable_debug_mode": true,
+    "cache_ttl_seconds": 300
+  },
+  "film_processing": {
+    "max_concurrent_jobs": 5,
+    "job_timeout_minutes": 30,
+    "quality_preset": "draft",
+    "enable_gpu_acceleration": false
+  },
+  "storage": {
+    "s3_bucket_prefix": "ai-film-studio-dev",
+    "retention_days": 7,
+    "enable_versioning": true
+  },
+  "monitoring": {
+    "cloudwatch_enabled": true,
+    "custom_metrics_enabled": true,
+    "log_retention_days": 7,
+    "enable_x_ray": false
+  },
+  "features": {
+    "auto_scene_detection": true,
+    "ai_voice_generation": false,
+    "collaborative_editing": false
+  }
+}
