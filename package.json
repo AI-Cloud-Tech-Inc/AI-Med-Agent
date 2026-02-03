@@ -4,10 +4,13 @@
   "description": "A Node.js app for AI Med Agent",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "build": "echo 'No build step required'"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "dependencies": {}
+  "dependencies": {
+    "express": "^4.18.2"
+  }
 }
