@@ -1,0 +1,13 @@
+{
+  "name": "ai-med-agent",
+  "version": "1.0.0",
+  "description": "A Node.js app for AI Med Agent",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {}
+}
